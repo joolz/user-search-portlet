@@ -1,10 +1,10 @@
 package joolz.test;
 
-import com.liferay.faces.portal.context.LiferayFacesContext;
-import com.liferay.portal.kernel.exception.PortalException;
+import com.liferay.portal.kernel.dao.orm.QueryUtil;
 import com.liferay.portal.kernel.exception.SystemException;
 import com.liferay.portal.kernel.log.Log;
 import com.liferay.portal.kernel.log.LogFactoryUtil;
+import com.liferay.portal.kernel.util.OrderByComparator;
 import com.liferay.portal.kernel.workflow.WorkflowConstants;
 import com.liferay.portal.model.User;
 import com.liferay.portal.service.UserLocalServiceUtil;
@@ -21,41 +21,56 @@ import javax.faces.bean.ViewScoped;
 @ViewScoped
 public class MyBean {
 	private static final Log LOG = LogFactoryUtil.getLog(MyBean.class);
+	private static final LinkedHashMap<String, Object> PARAMS = new LinkedHashMap<String, Object>();
+	private static final long COMPANY_ID = 20155;
 
 	public void doSearch() {
-		int count;
-		final int active = WorkflowConstants.STATUS_APPROVED;
-		final LinkedHashMap<String, Object> params = new LinkedHashMap<String, Object>();
-		final LiferayFacesContext lfc = LiferayFacesContext.getInstance();
+
+		// assume User with the following credentials:
+		// screenName: xyz firstName: Firstname lastName: Lastname emailAddress:
+		// abcdefg@ijklm.nop
 
 		try {
-			final List<User> users = UserLocalServiceUtil.getUsers(-1, -1);
-			LOG.debug("==================================");
-			LOG.debug("All users:");
+			List<User> users = UserLocalServiceUtil.getUsers(QueryUtil.ALL_POS, QueryUtil.ALL_POS);
+			LOG.info("===============================");
+			LOG.info("All users:");
 			for (final User user : users) {
-				LOG.debug(user.getScreenName() + " - " + user.getFirstName() + " - " + user.getMiddleName() + " - "
+				LOG.info(user.getScreenName() + " - " + user.getFirstName() + " - " + user.getMiddleName() + " - "
 						+ user.getLastName() + " - " + user.getEmailAddress() + " - ");
 			}
 
-			final User user = UserLocalServiceUtil.getUserByScreenName(lfc.getCompanyId(), "jal");
-			LOG.debug("==================================");
-			LOG.debug("Got user " + user.getFirstName() + ", " + user.getMiddleName() + ", " + user.getLastName()
-					+ ", " + user.getScreenName() + ", " + user.getEmailAddress());
-			LOG.debug("Total number of users " + UserLocalServiceUtil.getUsersCount());
+			searchLoop(
+					"screenName",
+					new ArrayList<String>(Arrays.asList("xyz", "xy", "xyz*", "xy*", "*xyz", "*yz", "y", "*y", "y*",
+							"*y*", "**y**")));
 
-			final List<String> keywordsTest = new ArrayList<String>(Arrays.asList("a", "al", "alb", "l", "lb", "lbe",
-					"lberts", "a*", "al*", "alb*", "l*", "lb*", "lbe*", "lberts*"));
-			LOG.debug("companyId " + lfc.getCompanyId());
-			LOG.debug("active " + 0);
-			LOG.debug("params " + params);
+			searchLoop(
+					"firstName",
+					new ArrayList<String>(Arrays.asList("Firstname", "Fi", "Firstname*", "Fi*", "*Firstname",
+							"*irstname", "irstnam", "*irstnam", "irstnam*", "*irstnam*", "**irstnam**")));
 
-			LOG.debug("----------------------------------");
-			for (final String kw : keywordsTest) {
-				count = UserLocalServiceUtil.searchCount(lfc.getCompanyId(), kw, active, params);
-				LOG.debug("Count with keywords " + kw + ": " + count);
-			}
-		} catch (final PortalException | SystemException e) {
+			searchLoop(
+					"emailAddress",
+					new ArrayList<String>(Arrays.asList("abcdefg@ijklm.nop", "abcdefg@ijklm.n", "abcdefg@ijklm.nop*",
+							"abcdefg@ijkl*", "*abcdefg@ijklm.nop", "*defg@ijklm.nop", "cdefg@ijklm.n",
+							"*cdefg@ijklm.n", "cdefg@ijklm.n*", "*cdefg@ijklm.n*", "**cdefg@ijklm.n**")));
+
+			searchLoop("firstName again",
+					new ArrayList<String>(Arrays.asList("Firstname", "Firstnam", "Firstna", "Firstn", "First", "Firs")));
+
+		} catch (final SystemException e) {
 			e.printStackTrace();
+		}
+	}
+
+	private void searchLoop(final String label, final List<String> keywordsTest) throws SystemException {
+		LOG.info(label + " search ----------------------");
+		for (final String kw : keywordsTest) {
+			LOG.info("keyword "
+					+ kw
+					+ " number of users "
+					+ UserLocalServiceUtil.search(COMPANY_ID, kw, WorkflowConstants.STATUS_APPROVED, PARAMS,
+							QueryUtil.ALL_POS, QueryUtil.ALL_POS, (OrderByComparator) null).size());
 		}
 	}
 
